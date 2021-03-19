@@ -1,0 +1,8 @@
+<resources>
+    <string name="app_name">mPOS FT</string>
+    <string name="persistence_notification_channel_id">persistence_channel01</string>
+    <string name="stop_action_txt">STOP</string>
+    <string name="service_title">Background network monitoring is active.</string>
+    <string name="service_content"></string>
+    <string name="service_lbl">start</string>
+</resources>
