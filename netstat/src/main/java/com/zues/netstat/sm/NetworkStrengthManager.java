@@ -41,6 +41,8 @@ public class NetworkStrengthManager implements INetworkStrength {
             public void run() {
                 Looper.prepare();
                 mHandler = new Handler();
+                mHandler.post(mSignalRunnable);
+
                 Looper.loop();
             }
         });
@@ -49,7 +51,7 @@ public class NetworkStrengthManager implements INetworkStrength {
         mRunning = true;
 
         mTelephonyManager.listen(mPhoneStateListener, PhoneStateListener.LISTEN_SIGNAL_STRENGTHS);
-        mHandler.post(mSignalRunnable);
+//        mHandler.post(mSignalRunnable);
     }
 
     private PhoneStateListener mPhoneStateListener = new PhoneStateListener() {

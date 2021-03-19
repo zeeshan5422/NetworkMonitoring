@@ -34,7 +34,6 @@ public class HealthTools {
             if (healthOptions.getProgressExecutor() != null) {
                 healthOptions.getProgressExecutor().show();
             }
-            Thread.sleep(4000);
             return HealthTools.check(url, healthOptions);
         } catch (IOException e) {
             HealthStats stats = new HealthStats(url);
