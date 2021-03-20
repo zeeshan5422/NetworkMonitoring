@@ -13,11 +13,9 @@ import android.telephony.SignalStrength;
 import android.telephony.TelephonyManager;
 import android.text.Spannable;
 import android.text.SpannableString;
-import android.text.SpannableStringBuilder;
 import android.text.TextUtils;
 import android.text.style.ForegroundColorSpan;
 import android.util.Log;
-import android.view.MenuItem;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
@@ -33,8 +31,6 @@ import androidx.appcompat.widget.PopupMenu;
 import androidx.core.app.ActivityCompat;
 
 import com.master.permissionhelper.PermissionHelper;
-import com.zues.netstat.health.DialogExecutorImpl;
-import com.zues.netstat.health.DialogExecutorImpl2;
 import com.zues.netstat.health.HealthManager;
 import com.zues.netstat.utils.IPUtils;
 import com.zues.netstat.ping.PingManager;
@@ -42,6 +38,7 @@ import com.zues.netstat.dm.PingResult;
 import com.zues.netstat.dm.PingStats;
 import com.zues.netstat.service.NetworkStrengthService;
 import com.zues.netstat.dm.SignalStats;
+import com.zues.netstat.utils.JobExecutors;
 import com.zues.netstat.utils.NetworkUtils;
 
 import org.jetbrains.annotations.NotNull;
@@ -87,32 +84,14 @@ public class MainActivity extends AppCompatActivity {
         pingButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                new Thread(new Runnable() {
-                    @Override
-                    public void run() {
-                        try {
-                            doPing();
-                        } catch (Exception e) {
-                            e.printStackTrace();
-                        }
-                    }
-                }).start();
+                doPing();
             }
         });
 
         healthButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                new Thread(new Runnable() {
-                    @Override
-                    public void run() {
-                        try {
-                            doHealthCheck();
-                        } catch (Exception e) {
-                            e.printStackTrace();
-                        }
-                    }
-                }).start();
+                doHealthCheck();
             }
         });
 
@@ -185,34 +164,41 @@ public class MainActivity extends AppCompatActivity {
         // endregion  ------------------------------------------  Approach one ----------------------------------------------
 
         // Perform an asynchronous ping
-        PingManager.onAddress(ipAddress).setTimeOutMillis(1000).setTimes(4).doPing(new PingManager.PingListener() {
-            @Override
-            public void onResult(PingResult pingResult) {
-                if (pingResult.isReachable) {
-                    appendResultsText(new SpannableString(String.format("%.2f ms", pingResult.getTimeTaken())));
-                } else {
-                    appendResultsText(new SpannableString(getString(R.string.timeout)));
-                }
-                Log.d(TAG, " [ PING RESULT -> onResule ] : " + pingResult.toString());
-            }
+        PingManager
+                .onAddress(ipAddress)
+                .setTimeOutMillis(1000)
+                .setPingExecutor(JobExecutors.getInstance().diskIO())
+                .setDelayMillis(1000)
+                .setTimes(4)
+                .doPing(new PingManager.PingListener() {
+                    @Override
+                    public void onResult(PingResult pingResult) {
+                        if (pingResult.isReachable) {
+                            appendResultsText(new SpannableString(String.format("%.2f ms", pingResult.getTimeTaken())));
+                        } else {
+                            appendResultsText(new SpannableString(getString(R.string.timeout)));
+                        }
 
-            @Override
-            public void onFinished(PingStats pingStats) {
-                appendResultsText(new SpannableString(String.format("Pings: %d, Packets lost: %d",
-                        pingStats.getNoPings(), pingStats.getPacketsLost())));
-                appendResultsText(new SpannableString(String.format("Min/Avg/Max Time: %.2f/%.2f/%.2f ms",
-                        pingStats.getMinTimeTaken(), pingStats.getAverageTimeTaken(), pingStats.getMaxTimeTaken())));
-                setEnabled(pingButton, true);
-                Log.d(TAG, " [ PING STATS -> onFinished ] : " + pingStats.toString());
-            }
+                        Log.d(TAG, Thread.currentThread().getName() + " [ PING RESULT -> onResule ] : " + pingResult.toString());
+                    }
 
-            @Override
-            public void onError(Exception e) {
-                // TODO: STUB METHOD
-                appendResultsText(new SpannableString(e.getLocalizedMessage()));
-                setEnabled(pingButton, true);
-            }
-        });
+                    @Override
+                    public void onFinished(PingStats pingStats) {
+                        appendResultsText(new SpannableString(String.format("Pings: %d, Packets lost: %d",
+                                pingStats.getNoPings(), pingStats.getPacketsLost())));
+                        appendResultsText(new SpannableString(String.format("Min/Avg/Max Time: %.2f/%.2f/%.2f ms",
+                                pingStats.getMinTimeTaken(), pingStats.getAverageTimeTaken(), pingStats.getMaxTimeTaken())));
+                        setEnabled(pingButton, true);
+                        Log.d(TAG, Thread.currentThread().getName() + " [ PING STATS -> onFinished ] : " + pingStats.toString());
+                    }
+
+                    @Override
+                    public void onError(Exception e) {
+                        // TODO: STUB METHOD
+                        appendResultsText(new SpannableString(e.getLocalizedMessage()));
+                        setEnabled(pingButton, true);
+                    }
+                });
 
     }
 
@@ -229,6 +215,7 @@ public class MainActivity extends AppCompatActivity {
 
         HealthManager healthManager = HealthManager
                 .onUrl(ipAddress)
+                .setHealthExecutor(JobExecutors.getInstance().diskIO())
 //                .setProgressExecutor(new DialogExecutorImpl2(progressDialog))
                 .checkHealth(stats -> {
                     appendResultsText(new SpannableString(stats.toString()));

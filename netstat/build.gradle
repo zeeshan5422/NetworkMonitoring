@@ -40,6 +40,11 @@ dependencies {
     androidTestImplementation 'androidx.test.ext:junit:1.1.2'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.3.0'
     implementation("com.squareup.okhttp3:okhttp:4.9.0")
+
+//    def lifecycle_version = "2.3.0"
+//    implementation "androidx.lifecycle:lifecycle-runtime:$lifecycle_version"
+//    implementation "androidx.lifecycle:lifecycle-common-java8:$lifecycle_version"
+
 }
 repositories {
     mavenCentral()

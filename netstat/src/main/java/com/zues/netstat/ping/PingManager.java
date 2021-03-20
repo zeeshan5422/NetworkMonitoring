@@ -1,23 +1,20 @@
 package com.zues.netstat.ping;
 
+import android.util.Log;
+
+import androidx.annotation.NonNull;
+
 import com.zues.netstat.dm.PingOptions;
 import com.zues.netstat.dm.PingResult;
 import com.zues.netstat.dm.PingStats;
 
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
 
 public class PingManager {
-
-    // Only try ping using the java method
-    public static final int PING_JAVA = 0;
-
-    // Only try ping using the native method (will only work if native ping binary is found)
-    public static final int PING_NATIVE = 1;
-
-    // Use a hybrid ping that will attempt to use native binary but fallback to using java method
-    // if it's not found.
-    public static final int PING_HYBRID = 2;
+    private static final String TAG = PingManager.class.getSimpleName();
 
     // This class is not to be instantiated
     private PingManager() {
@@ -25,7 +22,9 @@ public class PingManager {
 
     public interface PingListener {
         void onResult(PingResult pingResult);
+
         void onFinished(PingStats pingStats);
+
         void onError(Exception e);
     }
 
@@ -35,10 +34,11 @@ public class PingManager {
     private int delayBetweenScansMillis = 0;
     private int times = 1;
     private boolean cancelled = false;
+    private Executor pingExecutor = Executors.newSingleThreadExecutor();
 
     /**
      * Set the address to ping
-     *
+     * <p>
      * Note that a lookup is not performed here so that we do not accidentally perform a network
      * request on the UI thread.
      *
@@ -85,6 +85,18 @@ public class PingManager {
         if (delayBetweenScansMillis < 0)
             throw new IllegalArgumentException("Delay cannot be less than 0");
         this.delayBetweenScansMillis = delayBetweenScansMillis;
+        return this;
+    }
+
+    /**
+     * Set the Executor for execution of ping.
+     * Note:: Please don't pass MainThread Executor, as it may block the UI Thread.
+     *
+     * @param pingExecutor - Executor for job execution
+     * @return this object to allow chaining
+     */
+    public PingManager setPingExecutor(@NonNull Executor pingExecutor) {
+        this.pingExecutor = pingExecutor;
         return this;
     }
 
@@ -145,7 +157,7 @@ public class PingManager {
 
     /**
      * Perform a synchronous ping and return a result, will ignore number of times.
-     *
+     * <p>
      * Note that this should be performed on a background thread as it will perform a network
      * request
      *
@@ -165,8 +177,11 @@ public class PingManager {
      * @return - this so we can cancel if needed
      */
     public PingManager doPing(final PingListener pingListener) {
+        if (pingExecutor == null) {
+            throw new IllegalArgumentException("pingExecutor must not be null ");
+        }
 
-        new Thread(new Runnable() {
+        pingExecutor.execute(new Runnable() {
             @Override
             public void run() {
 
@@ -216,6 +231,7 @@ public class PingManager {
 
                     try {
                         Thread.sleep(delayBetweenScansMillis);
+                        if (cancelled) break;
                     } catch (InterruptedException e) {
                         e.printStackTrace();
                     }
@@ -225,7 +241,7 @@ public class PingManager {
                     pingListener.onFinished(new PingStats(address, pingsCompleted, noLostPackets, totalPingTime, minPingTime, maxPingTime));
                 }
             }
-        }).start();
+        });
         return this;
     }
 

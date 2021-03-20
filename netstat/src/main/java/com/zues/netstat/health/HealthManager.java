@@ -3,6 +3,10 @@ package com.zues.netstat.health;
 import androidx.annotation.NonNull;
 
 import com.zues.netstat.dm.HealthOptions;
+import com.zues.netstat.ping.PingManager;
+
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
 
 public class HealthManager {
 
@@ -11,7 +15,7 @@ public class HealthManager {
     private final String url;
     private boolean cancelled = false;
     private final HealthOptions healthOptions = new HealthOptions();
-    Thread thread = null;
+    private Executor healthExecutor = Executors.newSingleThreadExecutor();
 
     private HealthManager(@NonNull String url) {
         this.url = url;
@@ -34,16 +38,29 @@ public class HealthManager {
         return this;
     }
 
+    /**
+     * Set the Executor for execution of ping.
+     * Note:: Please don't pass MainThread Executor, as it may block the UI Thread.
+     *
+     * @param healthExecutor - Executor for job execution
+     * @return this object to allow chaining
+     */
+    public HealthManager setHealthExecutor(@NonNull Executor healthExecutor) {
+        this.healthExecutor = healthExecutor;
+        return this;
+    }
+
     public HealthManager checkHealth(@NonNull HealthListener listener) {
         cancelled = false;
-
-        thread = new Thread(() -> {
+        if (healthExecutor == null) {
+            throw new IllegalArgumentException("healthExecutor must not be null ");
+        }
+        healthExecutor.execute(() -> {
             HealthStats healthStats = HealthTools.startCheckingHealth(url, healthOptions);
             if (listener != null) {
                 listener.onResult(healthStats);
             }
         });
-        thread.start();
         return this;
     }
 
@@ -51,9 +68,6 @@ public class HealthManager {
      * Cancel a running call
      */
     public void cancel() {
-        if (thread != null) {
-            thread.interrupt();
-        }
         this.cancelled = true;
     }
 
